@@ -54,10 +54,11 @@ class TestParseHtmlTables(unittest.TestCase):
             (0,0), (0,1), (0,2), (0,3),(0,4), (0,5),(0,6), (0,7), (0,8), (0,9)
         })
 
-        self.assertEqual(data.top_heading_relations[1,3], {(0,3)})
+        self.assertEqual(data.top_heading_relations(1,3), {(0,3)})
         
         # If there are no left headings defined, then the left most column is considered the left heading
-        self.assertEqual(data.left_heading_relations[1,3], {(1,0)})
+        print(data.left_heading_relations(1,3))
+        self.assertEqual(data.left_heading_relations(1,3), {(1,0)})
 
     def test_multiple_top_headings(self):
         data = parse_html_tables("""
@@ -99,11 +100,11 @@ class TestParseHtmlTables(unittest.TestCase):
         self.assertEqual(data.up_relations[2,0], {(1,0)})
         self.assertEqual(data.up_relations[2,1], {(1,1)})
 
-        self.assertEqual(data.top_heading_relations[1,0], {(0,0)})
-        self.assertEqual(data.top_heading_relations[1,1], {(0,0)})
+        self.assertEqual(data.top_heading_relations(1,0), {(0,0)})
+        self.assertEqual(data.top_heading_relations(1,1), {(0,0)})
 
-        self.assertEqual(data.top_heading_relations[2,0], {(0,0), (1,0)})
-        self.assertEqual(data.top_heading_relations[2,1], {(0,0), (1,1)})
+        self.assertEqual(data.top_heading_relations(2,0), {(0,0), (1,0)})
+        self.assertEqual(data.top_heading_relations(2,1), {(0,0), (1,1)})
 
     def test_4x4_table_with_spans(self):
         """Test a 4x4 table with various row spans and column spans"""

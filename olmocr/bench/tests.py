@@ -35,9 +35,10 @@ class TableData:
 
     Further more, you can also query "top_heading" and "left_heading". Where we also mark cells that are considered "headings", ex. if they are in a thead
     html tag.
-    Then, for each cell, you may request top_heading/left_heading, which returns all cell positions that are headings in those directions
-    Cells inside of <th> tags are considered headings automatically, but if these are not present, then the leftmost
-    cell in a row in automaticaly considered a header, and the same for the top most cell in a column.
+
+    To get up/down/left/right simple relations, you can just query the data directly
+
+    To get top_heading/left_heading relations you should use the methods provided by this class which walk the connection graph from a cell to get the headings
     """
     cell_text: Dict[tuple[int, int], str] # Stores map from row, col to cell text
     heading_cells: Set[tuple[int, int]] # Contains the row, col pairs which are headings
@@ -47,8 +48,38 @@ class TableData:
     left_relations: Dict[tuple[int, int], Set[tuple[int, int]]]
     right_relations: Dict[tuple[int, int], Set[tuple[int, int]]]
 
-    top_heading_relations: Dict[tuple[int, int], Set[tuple[int, int]]]
-    left_heading_relations: Dict[tuple[int, int], Set[tuple[int, int]]]
+    def _walk_heading_relations(self, start: tuple[int, int], relation: Dict[tuple[int, int], Set[tuple[int, int]]]) -> Set[tuple[int, int]]:
+        resulting_heading_cells = set()
+        resulting_end_cells = set()
+
+        visited = set()
+        to_visit = {start}
+
+        while len(to_visit) > 0:
+            cur = to_visit.pop()
+            visited.add(cur)
+
+            if cur in self.heading_cells:
+                resulting_heading_cells.add(cur)
+
+            if cur not in relation or len(relation[cur]) == 0:
+                resulting_end_cells.add(cur)
+
+            to_visit |= relation[cur]
+
+        resulting_heading_cells -= {start}
+        resulting_end_cells -= {start}
+
+        if resulting_heading_cells:
+            return resulting_heading_cells
+        else:
+            return resulting_end_cells
+        
+    def top_heading_relations(self, start_row: int, start_col: int) -> Set[tuple[int, int]]:
+        return self._walk_heading_relations((start_row, start_col), self.up_relations)
+
+    def left_heading_relations(self, start_row: int, start_col: int) -> Set[tuple[int, int]]:
+        return self._walk_heading_relations((start_row, start_col), self.left_relations)
 
 
 class TestType(str, Enum):
@@ -281,35 +312,12 @@ def _build_table_data_from_specs(row_specs: List[List[Dict[str, Union[str, int, 
                 up_rel[cell_id].add(neighbor)
                 break
 
-        # Top heading relations
-        for col in range(col_start, col_end + 1):
-            seen = set()
-            for row in range(row_start - 1, -1, -1):
-                neighbor = occupancy[row][col]
-                if neighbor is None or neighbor == cell_id or neighbor in seen:
-                    continue
-                seen.add(neighbor)
-                if neighbor in heading_cells:
-                    top_heading_rel[cell_id].add(neighbor)
-
-        # Left heading relations
-        for row in range(row_start, row_end + 1):
-            seen = set()
-            for col in range(col_start - 1, -1, -1):
-                neighbor = occupancy[row][col]
-                if neighbor is None or neighbor == cell_id or neighbor in seen:
-                    continue
-                seen.add(neighbor)
-                if neighbor in heading_cells:
-                    left_heading_rel[cell_id].add(neighbor)
 
     # Ensure every cell has an entry in relations dictionaries
     up_relations = {cell_id: set(up_rel[cell_id]) for cell_id in cell_text}
     down_relations = {cell_id: set(down_rel[cell_id]) for cell_id in cell_text}
     left_relations = {cell_id: set(left_rel[cell_id]) for cell_id in cell_text}
     right_relations = {cell_id: set(right_rel[cell_id]) for cell_id in cell_text}
-    top_heading_relations = {cell_id: set(top_heading_rel[cell_id]) for cell_id in cell_text}
-    left_heading_relations = {cell_id: set(left_heading_rel[cell_id]) for cell_id in cell_text}
 
     return TableData(
         cell_text=cell_text,
@@ -318,8 +326,6 @@ def _build_table_data_from_specs(row_specs: List[List[Dict[str, Union[str, int, 
         down_relations=down_relations,
         left_relations=left_relations,
         right_relations=right_relations,
-        top_heading_relations=top_heading_relations,
-        left_heading_relations=left_heading_relations,
     )
 
 
