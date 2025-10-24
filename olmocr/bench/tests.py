@@ -731,167 +731,61 @@ class TableTest(BasePDFTest):
 
         # Check each table
         for table_data in tables_to_check:
-            # Removed debug print statement
-            table_array = table_data.data
-            header_rows = table_data.header_rows
-            header_cols = table_data.header_cols
+            
 
             # Find all cells that match the target cell using fuzzy matching
             matches = []
-            for i in range(table_array.shape[0]):
-                for j in range(table_array.shape[1]):
-                    cell_content = normalize_text(table_array[i, j])
-                    similarity = fuzz.ratio(self.cell, cell_content) / 100.0
+            for (rowcol, cell_content) in table_data.cell_text.items():
+                similarity = fuzz.ratio(self.cell, cell_content) / 100.0
 
-                    if similarity >= threshold:
-                        matches.append((i, j))
+                if similarity >= threshold:
+                    matches.append(rowcol)
 
             # If no matches found in this table, continue to the next table
             if not matches:
                 continue
 
             # Check the relationships for each matching cell
-            for row_idx, col_idx in matches:
+            for rowcol in matches:
                 all_relationships_satisfied = True
                 current_failed_reasons = []
 
+                def _check_relationship(comparison_str: str, relation_func):
+                    nonlocal all_relationships_satisfied
+                    cur_relation_satisified = False
+                    best_similarity = 0
+
+                    for rowcol_up in relation_func(rowcol):
+                        test_cell = normalize_text(table_data.cell_text[rowcol_up])
+                        test_similarity = fuzz.ratio(comparison_str, test_cell) / 100.0
+                        best_similarity = max(best_similarity, test_similarity)
+                        if test_similarity >= max(0.5, 1.0 - (self.max_diffs / (len(comparison_str) if len(comparison_str) > 0 else 1))):
+                            cur_relation_satisified = True
+                    
+                    if not cur_relation_satisified:
+                        all_relationships_satisfied = False
+                        current_failed_reasons.append(f"Cell compared to '{self.cell}' doesn't match expected '{comparison_str}' (best similarity: {best_similarity:.2f})")
+
+
                 # Check up relationship
-                if self.up and row_idx > 0:
-                    up_cell = normalize_text(table_array[row_idx - 1, col_idx])
-                    up_similarity = fuzz.ratio(self.up, up_cell) / 100.0
-                    if up_similarity < max(0.5, 1.0 - (self.max_diffs / (len(self.up) if len(self.up) > 0 else 1))):
-                        all_relationships_satisfied = False
-                        current_failed_reasons.append(f"Cell above '{up_cell}' doesn't match expected '{self.up}' (similarity: {up_similarity:.2f})")
+                if self.up:
+                    _check_relationship(self.up, lambda rowcol: table_data.up_relations[rowcol])
 
-                # Check down relationship
-                if self.down and row_idx < table_array.shape[0] - 1:
-                    down_cell = normalize_text(table_array[row_idx + 1, col_idx])
-                    down_similarity = fuzz.ratio(self.down, down_cell) / 100.0
-                    if down_similarity < max(0.5, 1.0 - (self.max_diffs / (len(self.down) if len(self.down) > 0 else 1))):
-                        all_relationships_satisfied = False
-                        current_failed_reasons.append(f"Cell below '{down_cell}' doesn't match expected '{self.down}' (similarity: {down_similarity:.2f})")
+                if self.down:
+                    _check_relationship(self.down, lambda rowcol: table_data.down_relations[rowcol])
 
-                # Check left relationship
-                if self.left and col_idx > 0:
-                    left_cell = normalize_text(table_array[row_idx, col_idx - 1])
-                    left_similarity = fuzz.ratio(self.left, left_cell) / 100.0
-                    if left_similarity < max(0.5, 1.0 - (self.max_diffs / (len(self.left) if len(self.left) > 0 else 1))):
-                        all_relationships_satisfied = False
-                        current_failed_reasons.append(
-                            f"Cell to the left '{left_cell}' doesn't match expected '{self.left}' (similarity: {left_similarity:.2f})"
-                        )
+                if self.left:
+                    _check_relationship(self.left, lambda rowcol: table_data.left_relations[rowcol])                                        
 
-                # Check right relationship
-                if self.right and col_idx < table_array.shape[1] - 1:
-                    right_cell = normalize_text(table_array[row_idx, col_idx + 1])
-                    right_similarity = fuzz.ratio(self.right, right_cell) / 100.0
-                    if right_similarity < max(0.5, 1.0 - (self.max_diffs / (len(self.right) if len(self.right) > 0 else 1))):
-                        all_relationships_satisfied = False
-                        current_failed_reasons.append(
-                            f"Cell to the right '{right_cell}' doesn't match expected '{self.right}' (similarity: {right_similarity:.2f})"
-                        )
+                if self.right:
+                    _check_relationship(self.right, lambda rowcol: table_data.right_relations[rowcol])                    
 
-                # Check top heading relationship
-                if self.top_heading:
-                    # Try to find a match in the column headers
-                    top_heading_found = False
-                    best_match = ""
-                    best_similarity = 0
-
-                    # Check the col_headers dictionary first (this handles colspan properly)
-                    if col_idx in table_data.col_headers:
-                        for _, header_text in table_data.col_headers[col_idx]:
-                            header_text = normalize_text(header_text)
-                            similarity = fuzz.ratio(self.top_heading, header_text) / 100.0
-                            if similarity > best_similarity:
-                                best_similarity = similarity
-                                best_match = header_text
-                                if best_similarity >= max(0.5, 1.0 - (self.max_diffs / (len(self.top_heading) if len(self.top_heading) > 0 else 1))):
-                                    top_heading_found = True
-                                    break
-
-                    # If no match found in col_headers, fall back to checking header rows
-                    if not top_heading_found and header_rows:
-                        for i in sorted(header_rows):
-                            if i < row_idx and table_array[i, col_idx].strip():
-                                header_text = normalize_text(table_array[i, col_idx])
-                                similarity = fuzz.ratio(self.top_heading, header_text) / 100.0
-                                if similarity > best_similarity:
-                                    best_similarity = similarity
-                                    best_match = header_text
-                                    if best_similarity >= max(0.5, 1.0 - (self.max_diffs / (len(self.top_heading) if len(self.top_heading) > 0 else 1))):
-                                        top_heading_found = True
-                                        break
-
-                    # If still no match, use any non-empty cell above as a last resort
-                    if not top_heading_found and not best_match and row_idx > 0:
-                        for i in range(row_idx):
-                            if table_array[i, col_idx].strip():
-                                header_text = normalize_text(table_array[i, col_idx])
-                                similarity = fuzz.ratio(self.top_heading, header_text) / 100.0
-                                if similarity > best_similarity:
-                                    best_similarity = similarity
-                                    best_match = header_text
-
-                    if not best_match:
-                        all_relationships_satisfied = False
-                        current_failed_reasons.append(f"No top heading found for cell at ({row_idx}, {col_idx})")
-                    elif best_similarity < max(0.5, 1.0 - (self.max_diffs / (len(self.top_heading) if len(self.top_heading) > 0 else 1))):
-                        all_relationships_satisfied = False
-                        current_failed_reasons.append(
-                            f"Top heading '{best_match}' doesn't match expected '{self.top_heading}' (similarity: {best_similarity:.2f})"
-                        )
-
-                # Check left heading relationship
                 if self.left_heading:
-                    # Try to find a match in the row headers
-                    left_heading_found = False
-                    best_match = ""
-                    best_similarity = 0
+                    _check_relationship(self.left_heading, lambda rowcol: table_data.left_heading_relations(*rowcol))                                        
 
-                    # Check the row_headers dictionary first (this handles rowspan properly)
-                    if row_idx in table_data.row_headers:
-                        for _, header_text in table_data.row_headers[row_idx]:
-                            header_text = normalize_text(header_text)
-                            similarity = fuzz.ratio(self.left_heading, header_text) / 100.0
-                            if similarity > best_similarity:
-                                best_similarity = similarity
-                                best_match = header_text
-                                if best_similarity >= max(0.5, 1.0 - (self.max_diffs / (len(self.left_heading) if len(self.left_heading) > 0 else 1))):
-                                    left_heading_found = True
-                                    break
-
-                    # If no match found in row_headers, fall back to checking header columns
-                    if not left_heading_found and header_cols:
-                        for j in sorted(header_cols):
-                            if j < col_idx and table_array[row_idx, j].strip():
-                                header_text = normalize_text(table_array[row_idx, j])
-                                similarity = fuzz.ratio(self.left_heading, header_text) / 100.0
-                                if similarity > best_similarity:
-                                    best_similarity = similarity
-                                    best_match = header_text
-                                    if best_similarity >= max(0.5, 1.0 - (self.max_diffs / (len(self.left_heading) if len(self.left_heading) > 0 else 1))):
-                                        left_heading_found = True
-                                        break
-
-                    # If still no match, use any non-empty cell to the left as a last resort
-                    if not left_heading_found and not best_match and col_idx > 0:
-                        for j in range(col_idx):
-                            if table_array[row_idx, j].strip():
-                                header_text = normalize_text(table_array[row_idx, j])
-                                similarity = fuzz.ratio(self.left_heading, header_text) / 100.0
-                                if similarity > best_similarity:
-                                    best_similarity = similarity
-                                    best_match = header_text
-
-                    if not best_match:
-                        all_relationships_satisfied = False
-                        current_failed_reasons.append(f"No left heading found for cell at ({row_idx}, {col_idx})")
-                    elif best_similarity < max(0.5, 1.0 - (self.max_diffs / (len(self.left_heading) if len(self.left_heading) > 0 else 1))):
-                        all_relationships_satisfied = False
-                        current_failed_reasons.append(
-                            f"Left heading '{best_match}' doesn't match expected '{self.left_heading}' (similarity: {best_similarity:.2f})"
-                        )
+                if self.top_heading:
+                    _check_relationship(self.top_heading, lambda rowcol: table_data.top_heading_relations(*rowcol))                                        
+        
 
                 # If all relationships are satisfied for this cell, the test passes
                 if all_relationships_satisfied:
