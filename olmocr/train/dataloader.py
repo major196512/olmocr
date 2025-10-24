@@ -29,6 +29,7 @@ import numpy as np
 import yaml
 from PIL import Image
 from pypdf import PdfReader
+import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
@@ -1176,8 +1177,8 @@ class Tokenizer(PipelineStep):
 
     def __call__(self, sample: Sample) -> Sample:
         """Tokenize messages and create labels for training."""
-        if np is None:
-            raise ImportError("numpy is required for Tokenizer step")
+        if torch is None:
+            raise ImportError("torch is required for Tokenizer step")
 
         # Extract user message and response
         user_messages = sample["user_messages"]
@@ -1200,33 +1201,33 @@ class Tokenizer(PipelineStep):
             text=[text],
             images=[main_image],
             padding=True,
-            return_tensors="np",
+            return_tensors="pt",
         )
 
         # Get labels by tokenizing the output text
-        labels = self.processor(text=[response], padding=True, return_tensors="np")
+        labels = self.processor(text=[response], padding=True, return_tensors="pt")
 
         # Append end-of-message token to the labels
         end_tokens = self.processor.tokenizer(self.end_of_message_token, add_special_tokens=False)["input_ids"]
-        end_tokens = np.array(end_tokens, dtype=inputs.input_ids.dtype)
+        end_tokens = torch.tensor(end_tokens, dtype=inputs.input_ids.dtype)
 
         # Handle the case where labels['input_ids'] is empty
         if labels["input_ids"].shape[1] == 0:
-            labels_input_ids_0 = np.array([], dtype=inputs.input_ids.dtype)
+            labels_input_ids_0 = torch.tensor([], dtype=inputs.input_ids.dtype)
         else:
-            labels_input_ids_0 = labels["input_ids"][0].astype(inputs.input_ids.dtype)
+            labels_input_ids_0 = labels["input_ids"][0].to(inputs.input_ids.dtype)
 
-        labels["input_ids"] = np.concatenate([labels_input_ids_0, end_tokens])
-        labels["input_ids"] = np.expand_dims(labels["input_ids"], axis=0)
+        labels["input_ids"] = torch.cat([labels_input_ids_0, end_tokens])
+        labels["input_ids"] = labels["input_ids"].unsqueeze(0)
 
         # Concatenate input_ids and labels
-        input_ids = np.concatenate([inputs.input_ids[0], labels.input_ids[0]], axis=0)
+        input_ids = torch.cat([inputs.input_ids[0], labels.input_ids[0]], dim=0)
 
         # All columns will participate in attention fully
-        attention_mask = np.ones_like(input_ids)
+        attention_mask = torch.ones_like(input_ids)
 
         # Create labels, masking the input portion with -100
-        labels_full = np.full_like(input_ids, fill_value=self.masking_index)
+        labels_full = torch.full_like(input_ids, fill_value=self.masking_index)
         labels_full[len(inputs.input_ids[0]) :] = labels.input_ids[0]
 
         # Return as dict, including pixel_values
@@ -1254,25 +1255,25 @@ class RandomTokenFlipper(PipelineStep):
         if "labels" not in sample or "input_ids" not in sample:
             return sample
 
-        # Work with copies to avoid modifying original arrays
-        labels = sample["labels"].copy()
-        input_ids = sample["input_ids"].copy()
+        # Work with clones to avoid modifying original tensors
+        labels = sample["labels"].clone() if torch.is_tensor(sample["labels"]) else torch.tensor(sample["labels"])
+        input_ids = sample["input_ids"].clone() if torch.is_tensor(sample["input_ids"]) else torch.tensor(sample["input_ids"])
 
         # Find indices where labels are not masked (i.e., output tokens)
-        non_masked_indices = np.where(labels != self.masking_index)[0]
+        non_masked_indices = torch.where(labels != self.masking_index)[0]
 
         if len(non_masked_indices) == 0:
             return sample
 
         # For each non-masked token, independently decide whether to flip
         for idx in non_masked_indices:
-            if np.random.random() < self.token_flip_rate:
+            if torch.rand(1).item() < self.token_flip_rate:
                 # Pick a random token from the valid tokens list
-                random_token = np.random.choice(self.valid_token_ids)
+                random_token = self.valid_token_ids[torch.randint(len(self.valid_token_ids), (1,)).item()]
                 input_ids[idx] = random_token
                 labels[idx] = self.masking_index
 
-        # Update sample with modified arrays
+        # Update sample with modified tensors
         sample["input_ids"] = input_ids
         sample["labels"] = labels
 
@@ -1583,16 +1584,23 @@ if __name__ == "__main__":
             # Show label masking
             print(f"\nLabel masking analysis:")
             labels = sample["labels"]
-            masked_count = np.sum(labels == -100)
-            total_count = len(labels)
+            # Handle both numpy arrays and torch tensors
+            if torch.is_tensor(labels):
+                masked_count = (labels == -100).sum().item()
+                total_count = labels.numel()
+                labels_array = labels.cpu().numpy() if labels.is_cuda else labels.numpy()
+            else:
+                masked_count = np.sum(labels == -100)
+                total_count = len(labels)
+                labels_array = labels
             print(f"  Total tokens: {total_count}")
             print(f"  Masked tokens: {masked_count} ({masked_count/total_count*100:.1f}%)")
             print(f"  Unmasked tokens: {total_count - masked_count} ({(total_count - masked_count)/total_count*100:.1f}%)")
 
             # Find the transition point
             transition_idx = None
-            for i in range(len(labels) - 1):
-                if labels[i] == -100 and labels[i + 1] != -100:
+            for i in range(len(labels_array) - 1):
+                if labels_array[i] == -100 and labels_array[i + 1] != -100:
                     transition_idx = i + 1
                     break
 
@@ -1601,15 +1609,21 @@ if __name__ == "__main__":
 
             # Print all tokens
             input_ids = sample["input_ids"]
-            print(f"\nAll tokens ({len(input_ids)} total):")
+            # Handle both numpy arrays and torch tensors
+            if torch.is_tensor(input_ids):
+                input_ids_array = input_ids.cpu().numpy() if input_ids.is_cuda else input_ids.numpy()
+            else:
+                input_ids_array = input_ids
+
+            print(f"\nAll tokens ({len(input_ids_array)} total):")
             print("Format: [index] Token (repr) | Label | Token ID")
             print("-" * 80)
 
-            for i in range(len(input_ids)):
-                token = processor.tokenizer.decode([input_ids[i]])
+            for i in range(len(input_ids_array)):
+                token = processor.tokenizer.decode([int(input_ids_array[i])])
                 token_repr = repr(token)
-                label = labels[i] if i < len(labels) else "N/A"
-                token_id = input_ids[i]
+                label = labels_array[i] if i < len(labels_array) else "N/A"
+                token_id = int(input_ids_array[i])
 
                 # Mark special positions
                 marker = ""
@@ -1617,7 +1631,7 @@ if __name__ == "__main__":
                     marker = " <-- TRANSITION (first unmasked)"
                 elif i == 0:
                     marker = " <-- START"
-                elif label != -100 and i > 0 and labels[i - 1] == -100:
+                elif label != -100 and i > 0 and labels_array[i - 1] == -100:
                     marker = " <-- response begins"
 
                 print(f"[{i:4d}] {token_repr:20s} | {str(label):6s} | {token_id:6d}{marker}")
@@ -1628,7 +1642,7 @@ if __name__ == "__main__":
             # Count consecutive high-value tokens that represent the image
             # Qwen uses tokens like 151859, 151860, etc. for image patches
             image_token_threshold = 151000  # Typical threshold for Qwen image tokens
-            image_token_count = np.sum(input_ids > image_token_threshold)
+            image_token_count = np.sum(input_ids_array > image_token_threshold)
 
             # Calculate prompt tokens (everything masked)
             prompt_token_count = masked_count
@@ -1657,7 +1671,10 @@ if __name__ == "__main__":
                     if "labels" in current_sample:
                         # Count total sequence length (all tokens, prompt + completion)
                         labels = current_sample["labels"]
-                        total_length = len(labels)
+                        if torch.is_tensor(labels):
+                            total_length = labels.numel()
+                        else:
+                            total_length = len(labels)
                         return (idx, total_length, None)
                     return (idx, None, "No labels in sample")
                 except Exception as e:
