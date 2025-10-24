@@ -4,7 +4,7 @@ set -e
 
 # Parse command line arguments
 CONFIG="olmocr/train/configs/qwen25_vl_b100_x1_default.yaml"
-DATASET="s3://ai2-oe-data/jakep/olmocr/olmOCR-mix-0825"
+DATASET="s3://ai2-oe-data/jakep/olmocr/olmOCR-mix-1025"
 SKIP_DOCKER_BUILD=false
 PREEMPTIBLE=false
 
