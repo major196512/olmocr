@@ -913,33 +913,33 @@ def generate_tests_from_html(html_content: str, pdf_id: str, page_num: int, rand
 
             if rowcol in table_data.up_relations and len(table_data.up_relations[rowcol]) > 0:
                 relation = random_gen.choice(list(table_data.up_relations[rowcol]))
-                if len(table_data.cell_text[relation].strip()) > 1:
-                    test_data["up"] = table_data.cell_text[relation]
+                if len(table_data.cell_text[relation].strip()) > 1 and "\n" not in table_data.cell_text[relation]:
+                    test_data["up"] = normalize_text(table_data.cell_text[relation])
 
             if rowcol in table_data.down_relations and len(table_data.down_relations[rowcol]) > 0:
                 relation = random_gen.choice(list(table_data.down_relations[rowcol]))
-                if len(table_data.cell_text[relation].strip()) > 1:
-                    test_data["down"] = table_data.cell_text[relation]
+                if len(table_data.cell_text[relation].strip()) > 1 and "\n" not in table_data.cell_text[relation]:
+                    test_data["down"] = normalize_text(table_data.cell_text[relation])
 
             if rowcol in table_data.left_relations and len(table_data.left_relations[rowcol]) > 0:
                 relation = random_gen.choice(list(table_data.left_relations[rowcol]))
-                if len(table_data.cell_text[relation].strip()) > 1:
-                    test_data["left"] = table_data.cell_text[relation]
+                if len(table_data.cell_text[relation].strip()) > 1 and "\n" not in table_data.cell_text[relation]:
+                    test_data["left"] = normalize_text(table_data.cell_text[relation])
 
             if rowcol in table_data.right_relations and len(table_data.right_relations[rowcol]) > 0:
                 relation = random_gen.choice(list(table_data.right_relations[rowcol]))
-                if len(table_data.cell_text[relation].strip()) > 1:
-                    test_data["right"] = table_data.cell_text[relation]
+                if len(table_data.cell_text[relation].strip()) > 1 and "\n" not in table_data.cell_text[relation]:
+                    test_data["right"] = normalize_text(table_data.cell_text[relation])
 
             if len(table_data.left_heading_relations(*rowcol)) > 0:
                 relation = random_gen.choice(list(table_data.left_heading_relations(*rowcol)))
-                if len(table_data.cell_text[relation].strip()) > 1:
-                    test_data["left_heading"] = table_data.cell_text[relation]
+                if len(table_data.cell_text[relation].strip()) > 1 and "\n" not in table_data.cell_text[relation]:
+                    test_data["left_heading"] = normalize_text(table_data.cell_text[relation])
 
             if len(table_data.top_heading_relations(*rowcol)) > 0:
                 relation = random_gen.choice(list(table_data.top_heading_relations(*rowcol)))
-                if len(table_data.cell_text[relation].strip()) > 1:
-                    test_data["top_heading"] = table_data.cell_text[relation]
+                if len(table_data.cell_text[relation].strip()) > 1 and "\n" not in table_data.cell_text[relation]:
+                    test_data["top_heading"] = normalize_text(table_data.cell_text[relation])
 
             # Only add the test if we have at least one relation
             if any(x in test_data for x in ["up", "down", "left", "right", "top_heading", "left_heading"]):
