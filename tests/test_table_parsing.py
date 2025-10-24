@@ -161,3 +161,19 @@ class TestParseHtmlTables(unittest.TestCase):
         self.assertEqual(data.heading_cells, {
             (0,0), (0,1), (0,3)
         })
+
+        self.assertEqual(data.left_heading_relations(0,0), set())
+        self.assertEqual(data.left_heading_relations(1,0), set())
+        self.assertEqual(data.left_heading_relations(2,0), set())
+        self.assertEqual(data.left_heading_relations(3,0), set())
+
+        self.assertEqual(data.top_heading_relations(0,0), set())
+        self.assertEqual(data.top_heading_relations(0,1), set())
+        self.assertEqual(data.top_heading_relations(0,2), set())
+        self.assertEqual(data.top_heading_relations(0,3), set())
+
+        self.assertEqual(data.left_heading_relations(1,1), {(1, 0)})
+        self.assertEqual(data.left_heading_relations(1,2), {(1, 0)})
+        self.assertEqual(data.left_heading_relations(1,3), {(1, 0)})
+ 
+        self.assertEqual(data.top_heading_relations(3,1), {(0,1), (0,3)})

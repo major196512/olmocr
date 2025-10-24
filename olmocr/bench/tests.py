@@ -64,8 +64,8 @@ class TableData:
 
             if cur not in relation or len(relation[cur]) == 0:
                 resulting_end_cells.add(cur)
-
-            to_visit |= relation[cur]
+            else:
+                to_visit |= relation[cur]
 
         resulting_heading_cells -= {start}
         resulting_end_cells -= {start}
