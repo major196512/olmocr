@@ -2,13 +2,12 @@ import json
 import os
 import re
 import unicodedata
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple, Union
-from collections import defaultdict
 
-import numpy as np
 from bs4 import BeautifulSoup
 from fuzzysearch import find_near_matches
 from rapidfuzz import fuzz
@@ -20,7 +19,6 @@ from .katex.render import compare_rendered_equations, render_equation
 
 # Tell pytest these are not tests
 __test__ = False
-
 
 
 @dataclass(frozen=True)
@@ -40,8 +38,9 @@ class TableData:
 
     To get top_heading/left_heading relations you should use the methods provided by this class which walk the connection graph from a cell to get the headings
     """
-    cell_text: Dict[tuple[int, int], str] # Stores map from row, col to cell text
-    heading_cells: Set[tuple[int, int]] # Contains the row, col pairs which are headings
+
+    cell_text: Dict[tuple[int, int], str]  # Stores map from row, col to cell text
+    heading_cells: Set[tuple[int, int]]  # Contains the row, col pairs which are headings
 
     up_relations: Dict[tuple[int, int], Set[tuple[int, int]]]
     down_relations: Dict[tuple[int, int], Set[tuple[int, int]]]
@@ -74,7 +73,7 @@ class TableData:
             return resulting_heading_cells
         else:
             return resulting_end_cells
-        
+
     def top_heading_relations(self, start_row: int, start_col: int) -> Set[tuple[int, int]]:
         return self._walk_heading_relations((start_row, start_col), self.up_relations)
 
@@ -133,6 +132,7 @@ def normalize_text(md_content: str) -> str:
         md_content = md_content.replace(fancy_char, ascii_char)
 
     return md_content
+
 
 def _safe_span_int(value: Optional[Union[str, int]], default: int = 1) -> int:
     """Convert rowspan/colspan attributes to positive integers."""
@@ -263,8 +263,6 @@ def _build_table_data_from_specs(row_specs: List[List[Dict[str, Union[str, int, 
     down_rel = defaultdict(set)
     left_rel = defaultdict(set)
     right_rel = defaultdict(set)
-    top_heading_rel = defaultdict(set)
-    left_heading_rel = defaultdict(set)
 
     for cell_id, meta in cell_meta.items():
         row_start = meta["row"]
@@ -311,7 +309,6 @@ def _build_table_data_from_specs(row_specs: List[List[Dict[str, Union[str, int, 
                     continue
                 up_rel[cell_id].add(neighbor)
                 break
-
 
     # Ensure every cell has an entry in relations dictionaries
     up_relations = {cell_id: set(up_rel[cell_id]) for cell_id in cell_text}
@@ -489,7 +486,7 @@ def parse_html_tables(html_content: str) -> List[TableData]:
                 for br in cell.find_all("br"):
                     br.replace_with("\n")
 
-                text = cell.get_text(separator="\n").strip()
+                text = cell.get_text(separator="").strip()
                 raw_rowspan = cell.get("rowspan")
                 raw_colspan = cell.get("colspan")
 
@@ -511,7 +508,6 @@ def parse_html_tables(html_content: str) -> List[TableData]:
             parsed_tables.append(table_data)
 
     return parsed_tables
-
 
 
 @dataclass(kw_only=True)
@@ -731,12 +727,10 @@ class TableTest(BasePDFTest):
 
         # Check each table
         for table_data in tables_to_check:
-            
-
             # Find all cells that match the target cell using fuzzy matching
             matches = []
-            for (rowcol, cell_content) in table_data.cell_text.items():
-                similarity = fuzz.ratio(self.cell, cell_content) / 100.0
+            for rowcol, cell_content in table_data.cell_text.items():
+                similarity = fuzz.ratio(self.cell, normalize_text(cell_content)) / 100.0
 
                 if similarity >= threshold:
                     matches.append(rowcol)
@@ -754,18 +748,23 @@ class TableTest(BasePDFTest):
                     nonlocal all_relationships_satisfied
                     cur_relation_satisified = False
                     best_similarity = 0
+                    best_similarity_text = None
 
                     for rowcol_up in relation_func(rowcol):
                         test_cell = normalize_text(table_data.cell_text[rowcol_up])
                         test_similarity = fuzz.ratio(comparison_str, test_cell) / 100.0
-                        best_similarity = max(best_similarity, test_similarity)
+                        if test_similarity > best_similarity:
+                            best_similarity = test_similarity
+                            best_similarity_text = test_cell
+
                         if test_similarity >= max(0.5, 1.0 - (self.max_diffs / (len(comparison_str) if len(comparison_str) > 0 else 1))):
                             cur_relation_satisified = True
-                    
+
                     if not cur_relation_satisified:
                         all_relationships_satisfied = False
-                        current_failed_reasons.append(f"Cell compared to '{self.cell}' doesn't match expected '{comparison_str}' (best similarity: {best_similarity:.2f})")
-
+                        current_failed_reasons.append(
+                            f"Cell compared to '{best_similarity_text}' doesn't match expected '{comparison_str}' (best similarity: {best_similarity:.2f})"
+                        )
 
                 # Check up relationship
                 if self.up:
@@ -775,17 +774,16 @@ class TableTest(BasePDFTest):
                     _check_relationship(self.down, lambda rowcol: table_data.down_relations[rowcol])
 
                 if self.left:
-                    _check_relationship(self.left, lambda rowcol: table_data.left_relations[rowcol])                                        
+                    _check_relationship(self.left, lambda rowcol: table_data.left_relations[rowcol])
 
                 if self.right:
-                    _check_relationship(self.right, lambda rowcol: table_data.right_relations[rowcol])                    
+                    _check_relationship(self.right, lambda rowcol: table_data.right_relations[rowcol])
 
                 if self.left_heading:
-                    _check_relationship(self.left_heading, lambda rowcol: table_data.left_heading_relations(*rowcol))                                        
+                    _check_relationship(self.left_heading, lambda rowcol: table_data.left_heading_relations(*rowcol))
 
                 if self.top_heading:
-                    _check_relationship(self.top_heading, lambda rowcol: table_data.top_heading_relations(*rowcol))                                        
-        
+                    _check_relationship(self.top_heading, lambda rowcol: table_data.top_heading_relations(*rowcol))
 
                 # If all relationships are satisfied for this cell, the test passes
                 if all_relationships_satisfied:

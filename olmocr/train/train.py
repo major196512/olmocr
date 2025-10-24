@@ -18,9 +18,9 @@ from torch.utils.data import ConcatDataset, DataLoader
 from tqdm import tqdm
 from transformers import (
     AutoProcessor,
-    Qwen3VLForConditionalGeneration,
     Qwen2_5_VLForConditionalGeneration,
     Qwen2VLForConditionalGeneration,
+    Qwen3VLForConditionalGeneration,
     get_scheduler,
 )
 

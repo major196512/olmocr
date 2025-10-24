@@ -8,7 +8,8 @@ from olmocr.bench.tests import (
 
 class TestParseHtmlTables(unittest.TestCase):
     def test_basic_table(self):
-        data = parse_html_tables("""
+        data = parse_html_tables(
+            """
                     <table border="1">
                         <thead>
                             <tr>
@@ -37,31 +38,31 @@ class TestParseHtmlTables(unittest.TestCase):
                                 <td>99.4</td>
                                 <td>72.0±1.1</td>
                             </tr>
-                        </tbody></table>""")[0]
-        
+                        </tbody></table>"""
+        )[0]
+
         print(data)
-        
-        self.assertEqual(data.cell_text[0,0], "")
-        self.assertEqual(data.cell_text[0,1], "ArXiv")
 
-        self.assertEqual(data.left_relations[0,0], set())
-        self.assertEqual(data.up_relations[0,0], set())
+        self.assertEqual(data.cell_text[0, 0], "")
+        self.assertEqual(data.cell_text[0, 1], "ArXiv")
 
-        self.assertEqual(data.left_relations[0,1], {(0,0)})
-        self.assertEqual(data.up_relations[1,0], {(0,0)})
+        self.assertEqual(data.left_relations[0, 0], set())
+        self.assertEqual(data.up_relations[0, 0], set())
 
-        self.assertEqual(data.heading_cells, {
-            (0,0), (0,1), (0,2), (0,3),(0,4), (0,5),(0,6), (0,7), (0,8), (0,9)
-        })
+        self.assertEqual(data.left_relations[0, 1], {(0, 0)})
+        self.assertEqual(data.up_relations[1, 0], {(0, 0)})
 
-        self.assertEqual(data.top_heading_relations(1,3), {(0,3)})
-        
+        self.assertEqual(data.heading_cells, {(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (0, 8), (0, 9)})
+
+        self.assertEqual(data.top_heading_relations(1, 3), {(0, 3)})
+
         # If there are no left headings defined, then the left most column is considered the left heading
-        print(data.left_heading_relations(1,3))
-        self.assertEqual(data.left_heading_relations(1,3), {(1,0)})
+        print(data.left_heading_relations(1, 3))
+        self.assertEqual(data.left_heading_relations(1, 3), {(1, 0)})
 
     def test_multiple_top_headings(self):
-        data = parse_html_tables("""
+        data = parse_html_tables(
+            """
                     <table border="1">
                         <thead>
                             <tr>
@@ -81,34 +82,35 @@ class TestParseHtmlTables(unittest.TestCase):
                                 <td>Oranges</td>
                                 <td>$2.00</td>
                             </tr>                                 
-                        </tbody></table>""")[0]
-        
+                        </tbody></table>"""
+        )[0]
+
         print(data)
-        
-        self.assertEqual(data.cell_text[0,0], "Fruit Costs in Unittest land")
-        self.assertEqual(data.cell_text[1,0], "Fruit Type")
-        self.assertEqual(data.cell_text[1,1], "Cost")
-        self.assertEqual(data.cell_text[2,0], "Apples")
-        self.assertEqual(data.cell_text[2,1], "$1.00")
-        self.assertEqual(data.cell_text[3,0], "Oranges")
-        self.assertEqual(data.cell_text[3,1], "$2.00")
 
+        self.assertEqual(data.cell_text[0, 0], "Fruit Costs in Unittest land")
+        self.assertEqual(data.cell_text[1, 0], "Fruit Type")
+        self.assertEqual(data.cell_text[1, 1], "Cost")
+        self.assertEqual(data.cell_text[2, 0], "Apples")
+        self.assertEqual(data.cell_text[2, 1], "$1.00")
+        self.assertEqual(data.cell_text[3, 0], "Oranges")
+        self.assertEqual(data.cell_text[3, 1], "$2.00")
 
-        self.assertEqual(data.up_relations[1,0], {(0,0)})
-        self.assertEqual(data.up_relations[1,1], {(0,0)})
+        self.assertEqual(data.up_relations[1, 0], {(0, 0)})
+        self.assertEqual(data.up_relations[1, 1], {(0, 0)})
 
-        self.assertEqual(data.up_relations[2,0], {(1,0)})
-        self.assertEqual(data.up_relations[2,1], {(1,1)})
+        self.assertEqual(data.up_relations[2, 0], {(1, 0)})
+        self.assertEqual(data.up_relations[2, 1], {(1, 1)})
 
-        self.assertEqual(data.top_heading_relations(1,0), {(0,0)})
-        self.assertEqual(data.top_heading_relations(1,1), {(0,0)})
+        self.assertEqual(data.top_heading_relations(1, 0), {(0, 0)})
+        self.assertEqual(data.top_heading_relations(1, 1), {(0, 0)})
 
-        self.assertEqual(data.top_heading_relations(2,0), {(0,0), (1,0)})
-        self.assertEqual(data.top_heading_relations(2,1), {(0,0), (1,1)})
+        self.assertEqual(data.top_heading_relations(2, 0), {(0, 0), (1, 0)})
+        self.assertEqual(data.top_heading_relations(2, 1), {(0, 0), (1, 1)})
 
     def test_4x4_table_with_spans(self):
         """Test a 4x4 table with various row spans and column spans"""
-        data = parse_html_tables("""
+        data = parse_html_tables(
+            """
                     <table border="1">
                         <thead>
                             <tr>
@@ -132,48 +134,47 @@ class TestParseHtmlTables(unittest.TestCase):
                                 <td colspan="3">Cell H-I-J (spans 3 cols)</td>
                             </tr>
                         </tbody>
-                    </table>""")[0]
+                    </table>"""
+        )[0]
 
         print(data)
 
         # Test header row
-        self.assertEqual(data.cell_text[0,0], "Header 1")
-        self.assertEqual(data.cell_text[0,1], "Header 2-3")
+        self.assertEqual(data.cell_text[0, 0], "Header 1")
+        self.assertEqual(data.cell_text[0, 1], "Header 2-3")
 
-        self.assertNotIn((0,2), data.cell_text)  # colspan=2, so that next cell is empty
-        self.assertEqual(data.cell_text[0,3], "Header 4")
+        self.assertNotIn((0, 2), data.cell_text)  # colspan=2, so that next cell is empty
+        self.assertEqual(data.cell_text[0, 3], "Header 4")
 
         # Test first body row
-        self.assertEqual(data.cell_text[1,0], "Cell A (spans 2 rows)")
-        self.assertEqual(data.cell_text[1,1], "Cell B")
-        self.assertEqual(data.cell_text[1,2], "Cell C")
-        self.assertEqual(data.cell_text[1,3], "Cell D (spans 2 rows)")
+        self.assertEqual(data.cell_text[1, 0], "Cell A (spans 2 rows)")
+        self.assertEqual(data.cell_text[1, 1], "Cell B")
+        self.assertEqual(data.cell_text[1, 2], "Cell C")
+        self.assertEqual(data.cell_text[1, 3], "Cell D (spans 2 rows)")
 
         # Test second body row
-        self.assertNotIn((2,0), data.cell_text)
-        self.assertEqual(data.cell_text[2,1], "Cell E-F (spans 2 cols)")
+        self.assertNotIn((2, 0), data.cell_text)
+        self.assertEqual(data.cell_text[2, 1], "Cell E-F (spans 2 cols)")
 
         # Test third body row
-        self.assertEqual(data.cell_text[3,0], "Cell G")
-        self.assertEqual(data.cell_text[3,1], "Cell H-I-J (spans 3 cols)")
+        self.assertEqual(data.cell_text[3, 0], "Cell G")
+        self.assertEqual(data.cell_text[3, 1], "Cell H-I-J (spans 3 cols)")
 
         # Test heading cells
-        self.assertEqual(data.heading_cells, {
-            (0,0), (0,1), (0,3)
-        })
+        self.assertEqual(data.heading_cells, {(0, 0), (0, 1), (0, 3)})
 
-        self.assertEqual(data.left_heading_relations(0,0), set())
-        self.assertEqual(data.left_heading_relations(1,0), set())
-        self.assertEqual(data.left_heading_relations(2,0), set())
-        self.assertEqual(data.left_heading_relations(3,0), set())
+        self.assertEqual(data.left_heading_relations(0, 0), set())
+        self.assertEqual(data.left_heading_relations(1, 0), set())
+        self.assertEqual(data.left_heading_relations(2, 0), set())
+        self.assertEqual(data.left_heading_relations(3, 0), set())
 
-        self.assertEqual(data.top_heading_relations(0,0), set())
-        self.assertEqual(data.top_heading_relations(0,1), set())
-        self.assertEqual(data.top_heading_relations(0,2), set())
-        self.assertEqual(data.top_heading_relations(0,3), set())
+        self.assertEqual(data.top_heading_relations(0, 0), set())
+        self.assertEqual(data.top_heading_relations(0, 1), set())
+        self.assertEqual(data.top_heading_relations(0, 2), set())
+        self.assertEqual(data.top_heading_relations(0, 3), set())
 
-        self.assertEqual(data.left_heading_relations(1,1), {(1, 0)})
-        self.assertEqual(data.left_heading_relations(1,2), {(1, 0)})
-        self.assertEqual(data.left_heading_relations(1,3), {(1, 0)})
- 
-        self.assertEqual(data.top_heading_relations(3,1), {(0,1), (0,3)})
+        self.assertEqual(data.left_heading_relations(1, 1), {(1, 0)})
+        self.assertEqual(data.left_heading_relations(1, 2), {(1, 0)})
+        self.assertEqual(data.left_heading_relations(1, 3), {(1, 0)})
+
+        self.assertEqual(data.top_heading_relations(3, 1), {(0, 1), (0, 3)})

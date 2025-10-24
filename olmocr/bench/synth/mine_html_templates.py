@@ -21,7 +21,7 @@ from playwright.async_api import async_playwright
 from syntok.segmenter import process
 from tqdm import tqdm
 
-from olmocr.bench.tests import TableTest, TestType, parse_html_tables
+from olmocr.bench.tests import TableTest, TestType, normalize_text, parse_html_tables
 from olmocr.data.renderpdf import (
     get_png_dimensions_from_base64,
     render_pdf_to_base64png,
@@ -883,36 +883,21 @@ def generate_tests_from_html(html_content: str, pdf_id: str, page_num: int, rand
 
     for table_idx, table_data in enumerate(table_data_list):
         # Get the table data as a numpy array
-        table_array = table_data.data
         table_tests = []
 
         # Skip tables that are too small
-        if table_array.shape[0] < 2 or table_array.shape[1] < 2:
+        if max(x[0] for x in table_data.cell_text.keys()) < 2:
+            continue
+        if max(x[1] for x in table_data.cell_text.keys()) < 2:
             continue
 
-        # Get a limited number of cells to create tests for
-        # Select random rows and columns, excluding header rows/columns
-        non_header_rows = [i for i in range(table_array.shape[0]) if i not in table_data.header_rows]
-        non_header_cols = [j for j in range(table_array.shape[1]) if j not in table_data.header_cols]
+        all_known_cells = list(table_data.cell_text.items())
+        random_gen.shuffle(all_known_cells)
 
-        # If we don't have enough non-header cells, use all cells
-        if len(non_header_rows) < 2 or len(non_header_cols) < 2:
-            cell_positions = [(i, j) for i in range(table_array.shape[0]) for j in range(table_array.shape[1])]
-        else:
-            cell_positions = [
-                (i, j)
-                for i in random_gen.sample(non_header_rows, min(3, len(non_header_rows)))
-                for j in random_gen.sample(non_header_cols, min(2, len(non_header_cols)))
-            ]
+        for rowcol, cell_content in all_known_cells:
+            cell_content = normalize_text(cell_content)
 
-        random_gen.shuffle(cell_positions)
-
-        # Create tests for each selected cell
-        for row_idx, col_idx in cell_positions:
-            cell_text = str(table_array[row_idx, col_idx]).strip()
-
-            # Skip cells with minimal text
-            if not cell_text or len(cell_text) < 3:
+            if len(cell_content) == 0:
                 continue
 
             # Create a TableTest with relevant relationships
@@ -921,57 +906,40 @@ def generate_tests_from_html(html_content: str, pdf_id: str, page_num: int, rand
                 "page": 1,
                 "id": f"{pdf_id}_table{table_idx}_{uuid.uuid4().hex[:8]}",
                 "type": TestType.TABLE.value,
-                "cell": cell_text,
+                "cell": cell_content,
                 "max_diffs": 0,
                 "ignore_markdown_tables": True,
             }
 
-            # Check cell up
-            if row_idx > 0:
-                up_text = str(table_array[row_idx - 1, col_idx]).strip()
-                if up_text and "\n" not in up_text:
-                    test_data["up"] = up_text
+            if rowcol in table_data.up_relations and len(table_data.up_relations[rowcol]) > 0:
+                relation = random_gen.choice(list(table_data.up_relations[rowcol]))
+                if len(table_data.cell_text[relation].strip()) > 1:
+                    test_data["up"] = table_data.cell_text[relation]
 
-            # Check cell down
-            if row_idx < table_array.shape[0] - 1:
-                down_text = str(table_array[row_idx + 1, col_idx]).strip()
-                if down_text and "\n" not in down_text:
-                    test_data["down"] = down_text
+            if rowcol in table_data.down_relations and len(table_data.down_relations[rowcol]) > 0:
+                relation = random_gen.choice(list(table_data.down_relations[rowcol]))
+                if len(table_data.cell_text[relation].strip()) > 1:
+                    test_data["down"] = table_data.cell_text[relation]
 
-            # Check cell left
-            if col_idx > 0:
-                left_text = str(table_array[row_idx, col_idx - 1]).strip()
-                if left_text and "\n" not in left_text:
-                    test_data["left"] = left_text
+            if rowcol in table_data.left_relations and len(table_data.left_relations[rowcol]) > 0:
+                relation = random_gen.choice(list(table_data.left_relations[rowcol]))
+                if len(table_data.cell_text[relation].strip()) > 1:
+                    test_data["left"] = table_data.cell_text[relation]
 
-            # Check cell right
-            if col_idx < table_array.shape[1] - 1:
-                right_text = str(table_array[row_idx, col_idx + 1]).strip()
-                if right_text and "\n" not in right_text:
-                    test_data["right"] = right_text
+            if rowcol in table_data.right_relations and len(table_data.right_relations[rowcol]) > 0:
+                relation = random_gen.choice(list(table_data.right_relations[rowcol]))
+                if len(table_data.cell_text[relation].strip()) > 1:
+                    test_data["right"] = table_data.cell_text[relation]
 
-            # Check if current cell is a heading cell
-            is_header_cell = row_idx in table_data.header_rows or col_idx in table_data.header_cols
+            if len(table_data.left_heading_relations(*rowcol)) > 0:
+                relation = random_gen.choice(list(table_data.left_heading_relations(*rowcol)))
+                if len(table_data.cell_text[relation].strip()) > 1:
+                    test_data["left_heading"] = table_data.cell_text[relation]
 
-            # Check for top heading using header information (skip if current cell is a heading)
-            if not is_header_cell and col_idx in table_data.col_headers:
-                # Get the headers for this column
-                col_headers = table_data.col_headers[col_idx]
-                if col_headers:
-                    # Use the first header as the top heading
-                    _, top_heading = col_headers[0]
-                    if top_heading and "\n" not in top_heading:
-                        test_data["top_heading"] = top_heading
-
-            # Check for left heading using header information (skip if current cell is a heading)
-            if not is_header_cell and row_idx in table_data.row_headers:
-                # Get the headers for this row
-                row_headers = table_data.row_headers[row_idx]
-                if row_headers:
-                    # Use the first header as the left heading
-                    _, left_heading = row_headers[0]
-                    if left_heading and "\n" not in left_heading:
-                        test_data["left_heading"] = left_heading
+            if len(table_data.top_heading_relations(*rowcol)) > 0:
+                relation = random_gen.choice(list(table_data.top_heading_relations(*rowcol)))
+                if len(table_data.cell_text[relation].strip()) > 1:
+                    test_data["top_heading"] = table_data.cell_text[relation]
 
             # Only add the test if we have at least one relation
             if any(x in test_data for x in ["up", "down", "left", "right", "top_heading", "left_heading"]):
@@ -1007,8 +975,8 @@ def generate_tests_from_html(html_content: str, pdf_id: str, page_num: int, rand
                 if passed:
                     table_tests.append(test_data)
 
-            if len(table_tests) > 25:
-                break
+                if len(table_tests) > 25:
+                    break
 
         # Done with inner for loop iterating over cells
         # So add in the bulk of the test cases back in now
