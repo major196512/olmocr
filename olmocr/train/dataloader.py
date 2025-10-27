@@ -26,10 +26,10 @@ from typing import (
 )
 
 import numpy as np
+import torch
 import yaml
 from PIL import Image
 from pypdf import PdfReader
-import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 

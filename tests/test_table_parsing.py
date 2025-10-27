@@ -250,9 +250,16 @@ class TestParseHtmlTables(unittest.TestCase):
 
         # Test heading cells - all header rows should be marked as heading cells
         expected_heading_cells = {
-            (0, 0), (0, 1),  # First header row
-            (1, 1), (1, 4),  # Second header row
-            (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6)  # Third header row
+            (0, 0),
+            (0, 1),  # First header row
+            (1, 1),
+            (1, 4),  # Second header row
+            (2, 1),
+            (2, 2),
+            (2, 3),
+            (2, 4),
+            (2, 5),
+            (2, 6),  # Third header row
         }
         self.assertEqual(data.heading_cells, expected_heading_cells)
 
@@ -539,9 +546,9 @@ class TestParseHtmlTables(unittest.TestCase):
         # Test left heading relations
         # Store B row that says "22" should relate to just West
         left_relations_5_2 = data.left_heading_relations(5, 2)
-        self.assertEqual(data.cell_text[5,2], "22")
+        self.assertEqual(data.cell_text[5, 2], "22")
         self.assertIn((4, 0), left_relations_5_2)
         self.assertEqual(len(left_relations_5_2), 1)
 
         # But of the left headings themselves at the top, January, should have both Region and Store
-        self.assertEqual(data.left_heading_relations(3,2), {(0, 0), (0, 1)})
+        self.assertEqual(data.left_heading_relations(3, 2), {(0, 0), (0, 1)})
