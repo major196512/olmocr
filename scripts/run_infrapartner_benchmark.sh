@@ -1,12 +1,14 @@
 #!/bin/bash
 
 # Runs an olmocr-bench run using the full pipeline (no fallback) for infrapartner testing
-# This version skips the performance task and adds support for --server, --model, and --beaker-secret arguments
 #
-# Usage examples:
-#   ./scripts/run_infrapartner_benchmark.sh --server http://example.com --model your-model-name --beaker-secret my-api-key-secret
-#   ./scripts/run_infrapartner_benchmark.sh --beaker-image jakep/olmocr-benchmark-0.3.3-780bc7d934 --server http://example.com
-
+# Just make a beaker secret in the ai2/olmocr workspace with your API key
+#
+# Testing parasail
+# scripts/run_infrapartner_benchmark.sh --server https://api.parasail.io/v1 --model allenai/olmOCR-2-7B-1025 --beaker-secret jakep-parasail-api-key 
+#
+# Testing deepinfra
+# scripts/run_infrapartner_benchmark.sh --server https://api.deepinfra.com/v1/openai --model allenai/olmOCR-2-7B-1025 --beaker-secret jakep-deepinfra-api-key
 set -e
 
 # Parse command line arguments
