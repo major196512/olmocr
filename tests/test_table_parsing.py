@@ -42,6 +42,7 @@ class TestParseHtmlTables(unittest.TestCase):
         )[0]
 
         print(data)
+        self.assertTrue(data.is_fully_specified)
 
         self.assertEqual(data.cell_text[0, 0], "")
         self.assertEqual(data.cell_text[0, 1], "ArXiv")
@@ -107,6 +108,91 @@ class TestParseHtmlTables(unittest.TestCase):
         self.assertEqual(data.top_heading_relations(2, 0), {(0, 0), (1, 0)})
         self.assertEqual(data.top_heading_relations(2, 1), {(0, 0), (1, 1)})
 
+        self.assertTrue(data.is_fully_specified)
+
+    def test_extra_colspans(self):
+        data = parse_html_tables(
+            """
+                    <table border="1">
+                        <thead>
+                            <tr>
+                               <th colspan="3">Fruit Costs in Unittest land</th>
+                            </tr>
+                            <tr>
+                                <th>Fruit Type</th>
+                                <th>Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Apples</td>
+                                <td>$1.00</td>
+                                <td>Hi</td>
+                            </tr>
+                            <tr>
+                                <td>Oranges</td>
+                                <td>$2.00</td>
+                            </tr>                                 
+                        </tbody></table>"""
+        )[0]
+
+        self.assertFalse(data.is_fully_specified)
+
+    def test_extra_rowspans(self):
+        data = parse_html_tables(
+            """
+                    <table border="1">
+                        <thead>
+                            <tr>
+                               <th colspan="2">Fruit Costs in Unittest land</th>
+                            </tr>
+                            <tr>
+                                <th>Fruit Type</th>
+                                <th>Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td rowspan="2">Apples</td>
+                                <td>$1.00</td>
+                            </tr>
+                            <tr>
+                                <td>Oranges</td>
+                                <td>$2.00</td>
+                            </tr>                                 
+                        </tbody></table>"""
+        )[0]
+
+        self.assertFalse(data.is_fully_specified)        
+
+    def test_extra_rowspans_okay(self):
+        data = parse_html_tables(
+            """
+       <table border="1">
+                        <thead>
+                            <tr>
+                               <th colspan="2">Fruit Costs in Unittest land</th>
+                            </tr>
+                            <tr>
+                                <th>Fruit Type</th>
+                                <th>Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Apples</td>
+                                <td>$1.00</td>
+                            </tr>
+                            <tr>
+                                <td rowspan="2">Oranges</td>
+                                <td>$2.00</td>
+                            </tr> 
+                            <tr><td>a</td></tr>                                
+                        </tbody></table>"""
+        )[0]
+
+        self.assertTrue(data.is_fully_specified)              
+
     def test_4x4_table_with_spans(self):
         """Test a 4x4 table with various row spans and column spans"""
         data = parse_html_tables(
@@ -138,6 +224,7 @@ class TestParseHtmlTables(unittest.TestCase):
         )[0]
 
         print(data)
+        self.assertTrue(data.is_fully_specified)
 
         # Test header row
         self.assertEqual(data.cell_text[0, 0], "Header 1")
@@ -227,6 +314,8 @@ class TestParseHtmlTables(unittest.TestCase):
 
         print("\n=== Complex Multi-Level Headers Test ===")
         print(data)
+
+        self.assertTrue(data.is_fully_specified)
 
         # Test the three-level header structure
         self.assertEqual(data.cell_text[0, 0], "")  # Empty corner cell
@@ -364,6 +453,8 @@ class TestParseHtmlTables(unittest.TestCase):
         print("\n=== Left Headers with Row Spans Test ===")
         print(data)
 
+        self.assertTrue(data.is_fully_specified)
+
         # Test top headers
         self.assertEqual(data.cell_text[0, 2], "Quarter 1")
         self.assertEqual(data.cell_text[0, 5], "Quarter 2")
@@ -488,6 +579,8 @@ class TestParseHtmlTables(unittest.TestCase):
 
         print("\n=== Nested Header Groups with Col Spans Test ===")
         print(data)
+
+        self.assertTrue(data.is_fully_specified)
 
         # Test nested header structure
         self.assertEqual(data.cell_text[0, 0], "Region")
