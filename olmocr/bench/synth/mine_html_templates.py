@@ -1213,9 +1213,10 @@ async def process_pdf(pdf_info, args, client, pdf_filter=None):
     """Process a single PDF, render a random page, and create an HTML template."""
     pdf_path, index = pdf_info
 
-    # Create a unique folder for each PDF in the temp directory
+    # Create a unique folder for each PDF in the temp directory; include PID and PDF path hash to avoid cross-run collisions
     pdf_id = f"pdf_{index:05d}"
-    temp_pdf_dir = os.path.join(args.temp_dir, pdf_id)
+    temp_dir_suffix = f"{os.getpid()}_{hashlib.sha1(pdf_path.encode('utf-8')).hexdigest()[:16]}"
+    temp_pdf_dir = os.path.join(args.temp_dir, f"{pdf_id}_{temp_dir_suffix}")
     os.makedirs(temp_pdf_dir, exist_ok=True)
 
     # Determine if we should log table test verification
