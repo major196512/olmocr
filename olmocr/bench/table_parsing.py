@@ -26,7 +26,7 @@ class TableData:
     cell_text: Dict[tuple[int, int], str]  # Stores map from row, col to cell text
     heading_cells: Set[tuple[int, int]]  # Contains the row, col pairs which are headings
 
-    is_fully_specified: bool # Set to false if you have any missing cells, compared to the maximal number of row/cols including spans > 1
+    is_rectangular: bool # Set to false if you have any missing cells, compared to the maximal number of row/cols including spans > 1
 
     up_relations: Dict[tuple[int, int], Set[tuple[int, int]]]
     down_relations: Dict[tuple[int, int], Set[tuple[int, int]]]
@@ -256,7 +256,7 @@ def _build_table_data_from_specs(row_specs: List[List[Dict[str, Union[str, int, 
         down_relations=down_relations,
         left_relations=left_relations,
         right_relations=right_relations,
-        is_fully_specified=not any(any(x is None for x in row) for row in occupancy)
+        is_rectangular=not any(any(x is None for x in row) for row in occupancy)
     )
 
 

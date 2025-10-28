@@ -496,16 +496,25 @@ async def generate_html_from_image(client, image_base64):
 
             if not render_success:
                 print("Warning: Failed to render initial HTML to PDF for refinement")
-                # Fall back to returning the initial HTML without refinement
-                return initial_html
+                return None
 
             # Convert PDF back to PNG
             rendered_image_base64 = render_pdf_to_base64png(tmp_pdf_path, 1, max(png_width, png_height))
 
             if not rendered_image_base64:
                 print("Warning: Failed to convert rendered PDF to PNG for refinement")
-                # Fall back to returning the initial HTML without refinement
-                return initial_html
+                return None
+
+            # We are going to add some stuff to the prompt conditioned on if tables need to be corrected or not
+            extra_table_fixing_instructions = ""
+
+            # Check the tables, if they are non-rectangular, we can apply one more correction pass on them
+            table_data = parse_html_tables(initial_html)
+
+            if any(not table.is_rectangular for table in table_data):
+                extra_table_fixing_instructions = "Important: I've noticed that in the HTML table code, some of the columns/rows are not aligned right. " \
+                "Please work extra hard to make sure the table columns are correctly lined up as in the original document. " \
+                "You can add HTML comments as you output the table to help keep track of the current row and column if needed.\n"
 
             # Step 4: Refinement - Show both images to Claude and ask for corrections
             async with client.messages.stream(
@@ -535,6 +544,7 @@ async def generate_html_from_image(client, image_base64):
                                 "4. Occlusion - is any important content hidden or overlapping?\n"
                                 "5. Text formatting - are fonts, sizes, and styles appropriate?\n"
                                 "6. Tables - are the headers on tables are aligned with the correct corresponding columns?\n"
+                                f"{extra_table_fixing_instructions}"
                                 f"The webpage will be viewed at {png_width}x{png_height} pixels.\n\n"
                                 "Provide a REVISED version of the HTML that corrects any issues you identified. "
                                 "Make sure all important elements are visible and the layout matches the original as closely as possible.\n"
@@ -568,14 +578,17 @@ async def generate_html_from_image(client, image_base64):
                 total_output_tokens += refinement_response.usage.output_tokens
 
             refined_html = extract_code_block(refined_html_text)
+            final_html = refined_html if refined_html else initial_html
+
+            # Check the tables, if they are non-rectangular, we can apply one more correction pass on them
+            table_data = parse_html_tables(final_html)
+
+            if any(not table.is_rectangular for table in table_data):
+                print("Table not rectangular, aborting")
+                return None
 
             # Return refined HTML if available, otherwise return initial HTML
-            if refined_html:
-                print("Successfully refined HTML using visual comparison")
-                return refined_html
-            else:
-                print("Warning: No HTML code block found in refinement response, using initial HTML")
-                return initial_html
+            return final_html
 
         finally:
             # Clean up temporary PDF file
@@ -1471,12 +1484,23 @@ async def main():
     test_types = defaultdict(int)  # Automatically handles any test type
     results = []
 
+    # Tracking for success/failure rates
+    total_attempted = 0
+    successful_templates = 0
+    failed_templates = 0
+    failure_reasons = defaultdict(int)
+
     # Initialize an asyncio lock for file access
     file_lock = asyncio.Lock()
 
     # Process PDFs in parallel using asyncio
     async def process_with_progress(pdf_info):
         pdf_path = pdf_info[0]
+        nonlocal total_attempted, successful_templates, failed_templates
+
+        async with file_lock:
+            total_attempted += 1
+
         try:
             result = await process_pdf(pdf_info, args, client, pdf_filter)
             if result and result.get("tests"):
@@ -1499,11 +1523,23 @@ async def main():
                         test_type = test.get("type", "unknown")
                         test_types[test_type] += 1
 
+                    successful_templates += 1
                     print(f"Added {len(result['tests'])} tests from {result['pdf_id']}, total: {test_counter}")
 
                 return result
+            else:
+                async with file_lock:
+                    failed_templates += 1
+                    if result is None:
+                        failure_reasons["processing_failed"] += 1
+                    elif not result.get("tests"):
+                        failure_reasons["no_tests_generated"] += 1
+                return None
         except Exception as e:
             print(f"Error processing {pdf_path}: {e}")
+            async with file_lock:
+                failed_templates += 1
+                failure_reasons["exception"] += 1
             return None
 
     # Create tasks for all PDFs
@@ -1550,6 +1586,20 @@ async def main():
         print("Test type distribution:")
         for test_type, count in test_types.items():
             print(f"  - {test_type}: {count} tests")
+
+    # Print failure rate summary
+    print("\n===== Template Generation Summary =====")
+    print(f"Total PDFs attempted: {total_attempted}")
+    if total_attempted > 0:
+        print(f"Successfully generated: {successful_templates} ({successful_templates/total_attempted*100:.1f}%)")
+        print(f"Failed: {failed_templates} ({failed_templates/total_attempted*100:.1f}%)")
+    else:
+        print("No PDFs were processed")
+
+    if failed_templates > 0 and failure_reasons:
+        print("\nFailure breakdown:")
+        for reason, count in sorted(failure_reasons.items()):
+            print(f"  - {reason}: {count}")
 
     # Print final Claude API cost summary
     print("\nClaude Sonnet API Usage Summary:")

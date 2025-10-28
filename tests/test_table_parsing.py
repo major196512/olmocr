@@ -42,7 +42,7 @@ class TestParseHtmlTables(unittest.TestCase):
         )[0]
 
         print(data)
-        self.assertTrue(data.is_fully_specified)
+        self.assertTrue(data.is_rectangular)
 
         self.assertEqual(data.cell_text[0, 0], "")
         self.assertEqual(data.cell_text[0, 1], "ArXiv")
@@ -108,7 +108,7 @@ class TestParseHtmlTables(unittest.TestCase):
         self.assertEqual(data.top_heading_relations(2, 0), {(0, 0), (1, 0)})
         self.assertEqual(data.top_heading_relations(2, 1), {(0, 0), (1, 1)})
 
-        self.assertTrue(data.is_fully_specified)
+        self.assertTrue(data.is_rectangular)
 
     def test_extra_colspans(self):
         data = parse_html_tables(
@@ -136,7 +136,7 @@ class TestParseHtmlTables(unittest.TestCase):
                         </tbody></table>"""
         )[0]
 
-        self.assertFalse(data.is_fully_specified)
+        self.assertFalse(data.is_rectangular)
 
     def test_extra_rowspans(self):
         data = parse_html_tables(
@@ -163,7 +163,7 @@ class TestParseHtmlTables(unittest.TestCase):
                         </tbody></table>"""
         )[0]
 
-        self.assertFalse(data.is_fully_specified)        
+        self.assertFalse(data.is_rectangular)        
 
     def test_extra_rowspans_okay(self):
         data = parse_html_tables(
@@ -191,7 +191,7 @@ class TestParseHtmlTables(unittest.TestCase):
                         </tbody></table>"""
         )[0]
 
-        self.assertTrue(data.is_fully_specified)              
+        self.assertTrue(data.is_rectangular)              
 
     def test_4x4_table_with_spans(self):
         """Test a 4x4 table with various row spans and column spans"""
@@ -224,7 +224,7 @@ class TestParseHtmlTables(unittest.TestCase):
         )[0]
 
         print(data)
-        self.assertTrue(data.is_fully_specified)
+        self.assertTrue(data.is_rectangular)
 
         # Test header row
         self.assertEqual(data.cell_text[0, 0], "Header 1")
@@ -315,7 +315,7 @@ class TestParseHtmlTables(unittest.TestCase):
         print("\n=== Complex Multi-Level Headers Test ===")
         print(data)
 
-        self.assertTrue(data.is_fully_specified)
+        self.assertTrue(data.is_rectangular)
 
         # Test the three-level header structure
         self.assertEqual(data.cell_text[0, 0], "")  # Empty corner cell
@@ -453,7 +453,7 @@ class TestParseHtmlTables(unittest.TestCase):
         print("\n=== Left Headers with Row Spans Test ===")
         print(data)
 
-        self.assertTrue(data.is_fully_specified)
+        self.assertTrue(data.is_rectangular)
 
         # Test top headers
         self.assertEqual(data.cell_text[0, 2], "Quarter 1")
@@ -580,7 +580,7 @@ class TestParseHtmlTables(unittest.TestCase):
         print("\n=== Nested Header Groups with Col Spans Test ===")
         print(data)
 
-        self.assertTrue(data.is_fully_specified)
+        self.assertTrue(data.is_rectangular)
 
         # Test nested header structure
         self.assertEqual(data.cell_text[0, 0], "Region")
@@ -645,3 +645,331 @@ class TestParseHtmlTables(unittest.TestCase):
 
         # But of the left headings themselves at the top, January, should have both Region and Store
         self.assertEqual(data.left_heading_relations(3, 2), {(0, 0), (0, 1)})
+
+    def test_large_real_table(self):
+        html = """
+<table border="1">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="left-align">Grupo Ocupacional</th>
+                    <th rowspan="2" class="left-align">Classe Ocupacional</th>
+                    <th colspan="2">Superior</th>
+                    <th colspan="2">Médio</th>
+                    <th colspan="2">Baixo</th>
+                    <th colspan="2">Interior</th>
+                    <th colspan="2">Ínfimo</th>
+                    <th colspan="2">Total</th>
+                </tr>
+                <tr>
+                    <th>N (1.000s)</th>
+                    <th>%</th>
+                    <th>N (1.000s)</th>
+                    <th>%</th>
+                    <th>N (1.000s)</th>
+                    <th>%</th>
+                    <th>N (1.000s)</th>
+                    <th>%</th>
+                    <th>N (1.000s)</th>
+                    <th>%</th>
+                    <th>N (1.000s)</th>
+                    <th>%</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td rowspan="3" class="left-align">Empregadores</td>
+                    <td class="left-align">A-1 Empregadores (> 10)</td>
+                    <td>608</td>
+                    <td>67,3</td>
+                    <td>185</td>
+                    <td>20,4</td>
+                    <td>86</td>
+                    <td>9,6</td>
+                    <td>16</td>
+                    <td>1,8</td>
+                    <td>8</td>
+                    <td>0,9</td>
+                    <td>903</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">A-2 Empregadores (<= 10)</td>
+                    <td>1.555</td>
+                    <td>36,9</td>
+                    <td>1.107</td>
+                    <td>26,3</td>
+                    <td>1.036</td>
+                    <td>24,7</td>
+                    <td>341</td>
+                    <td>8,1</td>
+                    <td>171</td>
+                    <td>4,1</td>
+                    <td>4.213</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">Total</td>
+                    <td>2.162</td>
+                    <td>42,3</td>
+                    <td>1.292</td>
+                    <td>25,3</td>
+                    <td>1.126</td>
+                    <td>22,0</td>
+                    <td>357</td>
+                    <td>7,0</td>
+                    <td>179</td>
+                    <td>3,5</td>
+                    <td>5.116</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td rowspan="3" class="left-align">Profissionais</td>
+                    <td class="left-align">C Profissionais Autônomos</td>
+                    <td>1.643</td>
+                    <td>21,7</td>
+                    <td>1.513</td>
+                    <td>20,0</td>
+                    <td>2.073</td>
+                    <td>27,4</td>
+                    <td>1.225</td>
+                    <td>16,2</td>
+                    <td>1.108</td>
+                    <td>14,7</td>
+                    <td>7.562</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">D Profissionais Assalariados</td>
+                    <td>4.438</td>
+                    <td>13,3</td>
+                    <td>6.030</td>
+                    <td>18,0</td>
+                    <td>11.550</td>
+                    <td>34,5</td>
+                    <td>7.027</td>
+                    <td>21,0</td>
+                    <td>4.389</td>
+                    <td>13,1</td>
+                    <td>33.434</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">Total</td>
+                    <td>6.081</td>
+                    <td>14,8</td>
+                    <td>7.543</td>
+                    <td>18,4</td>
+                    <td>13.623</td>
+                    <td>33,2</td>
+                    <td>8.252</td>
+                    <td>20,1</td>
+                    <td>5.497</td>
+                    <td>13,4</td>
+                    <td>40.995</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td rowspan="4" class="left-align">Massa Não-Agrícola</td>
+                    <td class="left-align">F Trabalhadores Autônomos</td>
+                    <td>657</td>
+                    <td>3,5</td>
+                    <td>1.754</td>
+                    <td>9,2</td>
+                    <td>5.561</td>
+                    <td>29,2</td>
+                    <td>5.271</td>
+                    <td>27,7</td>
+                    <td>5.788</td>
+                    <td>30,4</td>
+                    <td>19.030</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">G Trabalhadores Assalariados</td>
+                    <td>282</td>
+                    <td>0,7</td>
+                    <td>1.657</td>
+                    <td>4,3</td>
+                    <td>10.363</td>
+                    <td>27,1</td>
+                    <td>13.002</td>
+                    <td>34,0</td>
+                    <td>12.968</td>
+                    <td>33,9</td>
+                    <td>38.272</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">I Trabalhadores Domésticos</td>
+                    <td>10</td>
+                    <td>0,1</td>
+                    <td>104</td>
+                    <td>1,6</td>
+                    <td>977</td>
+                    <td>14,7</td>
+                    <td>1.810</td>
+                    <td>27,3</td>
+                    <td>3.733</td>
+                    <td>56,3</td>
+                    <td>6.633</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">Total</td>
+                    <td>948</td>
+                    <td>1,5</td>
+                    <td>3.515</td>
+                    <td>5,5</td>
+                    <td>16.901</td>
+                    <td>26,4</td>
+                    <td>20.083</td>
+                    <td>31,4</td>
+                    <td>22.489</td>
+                    <td>35,2</td>
+                    <td>63.936</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td rowspan="4" class="left-align">Massa Agrícola</td>
+                    <td class="left-align">H-1 Proprietários Conta Própria</td>
+                    <td>188</td>
+                    <td>2,0</td>
+                    <td>364</td>
+                    <td>3,8</td>
+                    <td>1.387</td>
+                    <td>14,4</td>
+                    <td>1.889</td>
+                    <td>19,7</td>
+                    <td>5.779</td>
+                    <td>60,2</td>
+                    <td>9.608</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">H-2 Trabalhadores Autônomos</td>
+                    <td>5</td>
+                    <td>0,5</td>
+                    <td>14</td>
+                    <td>1,5</td>
+                    <td>72</td>
+                    <td>7,6</td>
+                    <td>152</td>
+                    <td>16,1</td>
+                    <td>703</td>
+                    <td>74,3</td>
+                    <td>946</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">H-3 Trabalhadores Assalariados</td>
+                    <td>17</td>
+                    <td>0,2</td>
+                    <td>58</td>
+                    <td>0,6</td>
+                    <td>794</td>
+                    <td>8,4</td>
+                    <td>2.260</td>
+                    <td>23,9</td>
+                    <td>6.322</td>
+                    <td>66,9</td>
+                    <td>9.451</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">Total</td>
+                    <td>210</td>
+                    <td>1,0</td>
+                    <td>436</td>
+                    <td>2,2</td>
+                    <td>2.253</td>
+                    <td>11,3</td>
+                    <td>4.301</td>
+                    <td>21,5</td>
+                    <td>12.805</td>
+                    <td>64,0</td>
+                    <td>20.005</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td rowspan="5" class="left-align">Não-remunerados</td>
+                    <td class="left-align">Não-remunerados Não-Agrícolas</td>
+                    <td>13</td>
+                    <td>6,8</td>
+                    <td>16</td>
+                    <td>8,1</td>
+                    <td>28</td>
+                    <td>14,0</td>
+                    <td>22</td>
+                    <td>10,9</td>
+                    <td>119</td>
+                    <td>60,2</td>
+                    <td>198</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">Não-remunerados Agrícolas</td>
+                    <td>5</td>
+                    <td>0,1</td>
+                    <td>13</td>
+                    <td>0,3</td>
+                    <td>59</td>
+                    <td>1,6</td>
+                    <td>352</td>
+                    <td>9,4</td>
+                    <td>3.302</td>
+                    <td>88,5</td>
+                    <td>3.731</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">Sem Ocupação Com Renda</td>
+                    <td>1.567</td>
+                    <td>6,0</td>
+                    <td>2.330</td>
+                    <td>8,9</td>
+                    <td>5.395</td>
+                    <td>20,7</td>
+                    <td>6.821</td>
+                    <td>26,2</td>
+                    <td>9.964</td>
+                    <td>38,2</td>
+                    <td>26.078</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">Sem Ocupação Sem Renda</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td>8.094</td>
+                    <td>100</td>
+                    <td>8.094</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td class="left-align">Ignorados</td>
+                    <td>177</td>
+                    <td>10,3</td>
+                    <td>202</td>
+                    <td>11,8</td>
+                    <td>364</td>
+                    <td>21,1</td>
+                    <td>337</td>
+                    <td>19,6</td>
+                    <td>640</td>
+                    <td>37,2</td>
+                    <td>1.720</td>
+                    <td>100</td>
+                </tr>
+            </tbody>
+        </table>
+"""
+
+        data = parse_html_tables(html)[0]
+
+        self.assertTrue(data.is_rectangular)
