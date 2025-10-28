@@ -33,6 +33,58 @@ total_input_tokens = 0
 total_output_tokens = 0
 
 
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_BACKOFF_SECONDS = 5
+
+
+def _is_overloaded_error(error: Exception) -> bool:
+    """Return True if the error indicates the Claude service is overloaded."""
+    return "Overloaded" in str(error)
+
+
+async def call_claude(
+    client: AsyncAnthropic,
+    *,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    initial_backoff: float = DEFAULT_BACKOFF_SECONDS,
+    **kwargs,
+):
+    """Call Claude with exponential backoff when the service is overloaded."""
+    delay = initial_backoff
+    for attempt in range(1, max_retries + 1):
+        try:
+            return await client.messages.create(**kwargs)
+        except Exception as error:
+            if not _is_overloaded_error(error) or attempt == max_retries:
+                raise
+
+            await asyncio.sleep(delay)
+            delay *= 2
+
+
+async def claude_stream(
+    client: AsyncAnthropic,
+    *,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    initial_backoff: float = DEFAULT_BACKOFF_SECONDS,
+    **kwargs,
+):
+    """Call Claude streaming endpoint and return final message with overload retries."""
+    delay = initial_backoff
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with client.messages.stream(**kwargs) as stream:
+                async for _ in stream:
+                    pass
+                return await stream.get_final_message()
+        except Exception as error:
+            if not _is_overloaded_error(error) or attempt == max_retries:
+                raise
+
+            await asyncio.sleep(delay)
+            delay *= 2
+
+
 def get_git_commit_hash():
     """Get the current git commit hash, if available."""
     try:
@@ -352,7 +404,8 @@ async def generate_html_from_image(client, image_base64):
     try:
         # Step 0: Check that the orientation of the original document is right-side-up. If not, we will
         # skip this page, to keep the code simple
-        orientation_response = await client.messages.create(
+        orientation_response = await call_claude(
+            client,
             model="claude-sonnet-4-5-20250929",
             max_tokens=1000,
             temperature=0,
@@ -396,7 +449,8 @@ async def generate_html_from_image(client, image_base64):
             return None
 
         # Step 1: Initial analysis and column detection
-        analysis_response = await client.messages.create(
+        analysis_response = await call_claude(
+            client,
             model="claude-sonnet-4-5-20250929",
             max_tokens=20000,
             temperature=0.1,
@@ -435,7 +489,8 @@ async def generate_html_from_image(client, image_base64):
             total_output_tokens += analysis_response.usage.output_tokens
 
         # Step 2: Initial HTML generation with detailed layout instructions
-        initial_response = await client.messages.create(
+        initial_response = await call_claude(
+            client,
             model="claude-sonnet-4-5-20250929",
             max_tokens=20000,
             temperature=0.2,
@@ -517,7 +572,8 @@ async def generate_html_from_image(client, image_base64):
                 "You can add HTML comments as you output the table to help keep track of the current row and column if needed.\n"
 
             # Step 4: Refinement - Show both images to Claude and ask for corrections
-            async with client.messages.stream(
+            refinement_response = await claude_stream(
+                client,
                 model="claude-sonnet-4-5-20250929",
                 max_tokens=40000,
                 temperature=1.0,
@@ -553,12 +609,7 @@ async def generate_html_from_image(client, image_base64):
                         ],
                     }
                 ],
-            ) as refinement_stream:
-
-                async for event in refinement_stream:
-                    pass
-
-                refinement_response = await refinement_stream.get_final_message()
+            )
 
             # Check if refinement response was complete
             if hasattr(refinement_response, "stop_reason") and refinement_response.stop_reason != "end_turn":
