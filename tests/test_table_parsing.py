@@ -163,7 +163,7 @@ class TestParseHtmlTables(unittest.TestCase):
                         </tbody></table>"""
         )[0]
 
-        self.assertFalse(data.is_rectangular)        
+        self.assertFalse(data.is_rectangular)
 
     def test_extra_rowspans_okay(self):
         data = parse_html_tables(
@@ -191,7 +191,7 @@ class TestParseHtmlTables(unittest.TestCase):
                         </tbody></table>"""
         )[0]
 
-        self.assertTrue(data.is_rectangular)              
+        self.assertTrue(data.is_rectangular)
 
     def test_4x4_table_with_spans(self):
         """Test a 4x4 table with various row spans and column spans"""

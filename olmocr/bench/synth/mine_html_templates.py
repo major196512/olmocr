@@ -567,9 +567,11 @@ async def generate_html_from_image(client, image_base64):
             table_data = parse_html_tables(initial_html)
 
             if any(not table.is_rectangular for table in table_data):
-                extra_table_fixing_instructions = "Important: I've noticed that in the HTML table code, some of the columns/rows are not aligned right. " \
-                "Please work extra hard to make sure the table columns are correctly lined up as in the original document. " \
-                "You can add HTML comments as you output the table to help keep track of the current row and column if needed.\n"
+                extra_table_fixing_instructions = (
+                    "Important: I've noticed that in the HTML table code, some of the columns/rows are not aligned right. "
+                    "Please work extra hard to make sure the table columns are correctly lined up as in the original document. "
+                    "You can add HTML comments as you output the table to help keep track of the current row and column if needed.\n"
+                )
 
             # Step 4: Refinement - Show both images to Claude and ask for corrections
             refinement_response = await claude_stream(
